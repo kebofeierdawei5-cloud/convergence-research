@@ -232,15 +232,21 @@ def _prompt_json_after_marker(prompt: str, marker: str, error_code: str) -> dict
         raise LocalInvestmentPilotError(error_code)
     return value
 
-def _capture_clipboard_response_once(path: str | Path) -> bool:
-    """Capture macOS clipboard only after an explicit Enter keypress.
+def _capture_clipboard_response_once(
+    path: str | Path,
+    *,
+    expected_existing_signature: tuple[int, int, str] | None = None,
+) -> bool:
+    """Read macOS clipboard once after Enter and safely capture a new response.
 
-    This is deliberately a one-shot read: no clipboard polling, background
-    monitor, browser access, Accessibility permission, or content logging.
-    Existing non-empty response files are never overwritten.
+    A populated response target is never overwritten during initial intake.
+    During an explicit repair wait, replacement is allowed only when its
+    current content-aware signature still matches the immutable prior target
+    observed by the caller. The previous raw response remains in an append-only
+    task artifact before this mutable working file is replaced.
     """
     if sys.platform != "darwin":
-        print("当前平台不支持剪贴板接收；请使用原有响应文件方式。", flush=True)
+        print("当前平台不支持剪贴板接收；请使用已保存的 JSON 文件。", flush=True)
         return False
     response_path = Path(path).expanduser()
     try:
@@ -253,9 +259,21 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
     except OSError as exc:
         print(f"无法检查响应目标：{type(exc).__name__}。", flush=True)
         return False
+
+    replacing_expected = False
     if existing.strip():
-        print("响应文件已有内容，不会用剪贴板覆盖；继续校验现有文件。", flush=True)
-        return True
+        current_signature = _response_file_signature(response_path)
+        if expected_existing_signature is None:
+            print("响应文件已有内容；首次接收不会覆盖，继续校验现有文件。", flush=True)
+            return True
+        if current_signature != expected_existing_signature:
+            print("响应文件在修正期间已变化；为避免覆盖新内容，本次未写入。", flush=True)
+            return False
+        replacing_expected = True
+    elif expected_existing_signature is not None:
+        print("原响应文件在修正期间已变为空或消失；本次未覆盖。", flush=True)
+        return False
+
     try:
         result = subprocess.run(
             ["pbpaste"], check=True, capture_output=True, timeout=5
@@ -265,27 +283,52 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
         return False
     raw = result.stdout
     if not raw.strip():
-        print("剪贴板为空；请先复制 ChatGPT 的完整回复，再按回车。", flush=True)
+        print("剪贴板为空；请先复制 ChatGPT 的完整回答，再回到终端按回车。", flush=True)
         return False
     if len(raw) > 2 * 1024 * 1024:
         print("剪贴板内容超过 2 MiB 安全上限，未写入。", flush=True)
         return False
     try:
-        raw.decode("utf-8")
+        decoded = raw.decode("utf-8")
     except UnicodeDecodeError:
         print("剪贴板内容不是有效 UTF-8，未写入。", flush=True)
         return False
-    # Recheck immediately before writing; never replace a file populated by
-    # another process while pbpaste was running.
+
+    # The repair prompt itself is copied to the clipboard before the operator
+    # sends it to ChatGPT. Do not mistake that prompt (or an unchanged previous
+    # answer) for the new assistant response and overwrite the working file.
+    if not any(marker in decoded for marker in ("{", "｛")):
+        print(
+            "剪贴板中没有发现 JSON 对象起始符；这通常表示剪贴板仍是 IIOS 修正提示，而不是 ChatGPT 新回答。"
+            "本次未覆盖原响应。请等新回答完整生成，点击新回答下方“复制”，再回终端按回车。",
+            flush=True,
+        )
+        return False
+    if replacing_expected and hashlib.sha256(raw).hexdigest() == expected_existing_signature[2]:
+        print(
+            "剪贴板与上一份失败回答完全相同，未覆盖原响应。请复制刚生成的新回答后再按回车。",
+            flush=True,
+        )
+        return False
+
+    # Immediately before replacement, prove the target is still the exact
+    # empty target or the exact prior version explicitly approved for repair.
     try:
-        if response_path.is_symlink() or response_path.read_bytes().strip():
-            print("响应文件在接收期间发生变化；为避免覆盖，已停止。", flush=True)
+        if response_path.is_symlink():
+            print("响应目标在接收期间变成符号链接；未写入。", flush=True)
             return False
-    except FileNotFoundError:
-        pass
+        latest = _response_file_signature(response_path)
+        if replacing_expected:
+            if latest != expected_existing_signature:
+                print("响应文件在剪贴板读取期间发生变化；为避免覆盖，已停止。", flush=True)
+                return False
+        elif latest is not None and latest[0] > 0:
+            print("响应文件在剪贴板读取期间被填充；为避免覆盖，已停止。", flush=True)
+            return False
     except OSError as exc:
         print(f"无法复核响应目标：{type(exc).__name__}。", flush=True)
         return False
+
     temporary = response_path.with_name(response_path.name + f".capture-{os.getpid()}.tmp")
     try:
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -297,13 +340,15 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
             temporary.unlink(missing_ok=True)
             print("响应目标在写入前变成符号链接；未覆盖。", flush=True)
             return False
-        try:
-            populated = response_path.read_bytes().strip()
-        except FileNotFoundError:
-            populated = b""
-        if populated:
+        latest = _response_file_signature(response_path)
+        if replacing_expected:
+            if latest != expected_existing_signature:
+                temporary.unlink(missing_ok=True)
+                print("响应文件在写入前再次发生变化；为避免覆盖，已停止。", flush=True)
+                return False
+        elif latest is not None and latest[0] > 0:
             temporary.unlink(missing_ok=True)
-            print("响应文件在写入前已被填充；未覆盖。", flush=True)
+            print("响应文件在写入前已被填充；为避免覆盖，已停止。", flush=True)
             return False
         os.replace(temporary, response_path)
         if os.name != "nt":
@@ -317,6 +362,7 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
         return False
     print(f"已接收剪贴板文本（{len(raw)} 字节）；正在进入原有内容校验。", flush=True)
     return True
+
 
 def _ask_operator_entry_zone() -> dict[str, Any]:
     """Collect the current company's entry-price band; never treat it as a global default."""
@@ -8563,11 +8609,95 @@ def _remove_json_trailing_commas(text: str) -> str:
     return "".join(output)
 
 
+def _normalize_json_presentation(text: str) -> str:
+    """Normalize typographic JSON delimiters and separators outside JSON strings."""
+    quote_pairs = {"“": "”", "‘": "’", "＂": "＂"}
+    output: list[str] = []
+    index = 0
+    in_string = False
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            output.append(char)
+            index += 1
+            continue
+        closing = quote_pairs.get(char)
+        if closing is not None:
+            closing_index = text.find(closing, index + 1)
+            if closing_index >= 0:
+                output.append(json.dumps(text[index + 1 : closing_index], ensure_ascii=False))
+                index = closing_index + 1
+                continue
+        replacements = {"：": ":", "，": ",", "｛": "{", "｝": "}", "\u00a0": " "}
+        output.append(replacements.get(char, char))
+        index += 1
+    return "".join(output)
+
+
+def _quote_unquoted_json_keys(text: str) -> str:
+    """Quote bare object keys only when an identifier is immediately followed by a colon."""
+    output: list[str] = []
+    index = 0
+    in_string = False
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            output.append(char)
+            index += 1
+            continue
+        output.append(char)
+        if char in "{,":
+            look = index + 1
+            while look < len(text) and text[look] in " \t\r\n":
+                look += 1
+            match = re.match(r"[^\W\d][\w$-]*", text[look:], flags=re.UNICODE)
+            if match:
+                key = match.group(0)
+                after_key = look + len(key)
+                colon = after_key
+                while colon < len(text) and text[colon] in " \t\r\n":
+                    colon += 1
+                if colon < len(text) and text[colon] == ":":
+                    output.append(text[index + 1 : look])
+                    output.append(json.dumps(key, ensure_ascii=False))
+                    output.append(text[after_key : colon + 1])
+                    index = colon + 1
+                    continue
+        index += 1
+    return "".join(output)
+
+
 def _extract_json_object(text: str) -> dict[str, Any]:
     """Accept one JSON object, optionally fenced, and reject every non-whitespace suffix."""
-    raw = str(text or "").strip()
+    raw = str(text or "").replace("\ufeff", "").strip()
     if not raw:
         raise LocalInvestmentPilotError("CHATGPT_JSON_EMPTY")
+    if raw.startswith("<escape>") and raw.endswith("</escape>"):
+        raw = raw[len("<escape>") : -len("</escape>")].strip()
     has_leading_fence = bool(re.match(r"^\s*```(?:json)?\s*", raw, flags=re.IGNORECASE))
     if has_leading_fence:
         raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, count=1, flags=re.IGNORECASE)
@@ -8598,9 +8728,20 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     # non-trailing malformed commas, and any non-whitespace suffix still fail.
     url_normalized = re.sub(r"(?i)\b(https?)\\://", r"\1://", candidate)
     url_normalized = re.sub(r"(?i)\bwww\\\.", "www.", url_normalized)
+    # ChatGPT may render JSON punctuation with typographic/full-width quotes.
+    # Strict JSON is attempted first; these presentation-only variants are
+    # tried only after strict parsing fails and never modify the raw attempt.
+    presentation_normalized = _normalize_json_presentation(candidate)
+    presentation_normalized = _quote_unquoted_json_keys(presentation_normalized)
     candidates = [candidate]
+    if presentation_normalized != candidate:
+        candidates.append(presentation_normalized)
     if url_normalized != candidate:
         candidates.append(url_normalized)
+    if url_normalized != candidate:
+        presentation_url_normalized = presentation_normalized.replace(r"\://", "://").replace(r"\.", ".")
+        if presentation_url_normalized != presentation_normalized:
+            candidates.append(presentation_url_normalized)
     for base_candidate in list(candidates):
         comma_repaired = _remove_json_trailing_commas(base_candidate)
         if comma_repaired != base_candidate:
@@ -8621,9 +8762,14 @@ def _extract_json_object(text: str) -> dict[str, Any]:
         break
 
     if parse_error is not None:
+        bad_char = parsed_candidate[parse_error.pos : parse_error.pos + 1]
+        char_detail = (
+            f"；该位置字符={bad_char!r}（U+{ord(bad_char):04X}）"
+            if bad_char else ""
+        )
         detail = (
             f"{parse_error.msg}（第 {parse_error.lineno} 行，第 "
-            f"{parse_error.colno} 列）"
+            f"{parse_error.colno} 列{char_detail}）"
         )
         raise LocalInvestmentPilotError(
             "CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT: "
@@ -9053,6 +9199,7 @@ def _wait_for_response_file_change(
     previous_signature: tuple[int, int, str] | None,
     poll_interval: float = 0.25,
     stable_seconds: float = 0.75,
+    allow_clipboard_replacement: bool = False,
 ) -> tuple[int, int, str]:
     """Wait until a non-empty response file changes and remains stable.
 
@@ -9100,20 +9247,40 @@ def _wait_for_response_file_change(
                             return captured
                     print(_response_file_diagnostic(response_path), flush=True)
                     print(
-                        "如不使用剪贴板，可继续按原方式保存 JSON 文件；"
-                        "系统不会持续读取剪贴板。",
+                        "系统继续等待，不会弹出文件选择窗口。请复制 ChatGPT 新生成的完整回答后再按回车；"
+                        "也可将完整 JSON 保存到响应文件，程序会自动检测保存变化。",
                         flush=True,
                     )
-                    _choose_saved_response_file(response_path)
-                elif latest == previous_signature:
-                    # Explicit Enter means the operator requests a fresh validation
-                    # even when file metadata/content did not change since the prior read.
+                elif latest == previous_signature and not allow_clipboard_replacement:
+                    # Normal saved-file path: an unchanged non-empty response
+                    # is explicitly revalidated, never replaced by clipboard.
                     print(
-                        "指定结果文件当前非空，但内容签名与上次读取相同；"
-                        "按回车请求重新校验当前文件。",
+                        "指定响应文件已有内容且未变化；按回车重新校验当前文件，不读取剪贴板。",
                         flush=True,
                     )
                     return latest
+                elif latest == previous_signature and allow_clipboard_replacement:
+                    # Only the explicit validation-repair path enables this
+                    # replacement. The current bytes are already retained in
+                    # the task's append-only attempt history.
+                    print(
+                        "检测到本轮修正等待。按回车将尝试一次性接收剪贴板中的新回答；"
+                        "此前的原始回答仍保存在不可变历史记录中。",
+                        flush=True,
+                    )
+                    if _capture_clipboard_response_once(
+                        response_path,
+                        expected_existing_signature=latest,
+                    ):
+                        captured = _response_file_signature(response_path)
+                        if captured is not None and captured[0] > 0 and captured != latest:
+                            return captured
+                    print(_response_file_diagnostic(response_path), flush=True)
+                    print(
+                        "本轮旧响应保持不变，系统继续等待。请在 ChatGPT 新回答完整生成后点击该新回答下方“复制”，"
+                        "再回本终端按回车；不要复制 IIOS 修正提示本身。",
+                        flush=True,
+                    )
         else:
             _time.sleep(poll_interval)
 
@@ -9384,11 +9551,14 @@ def _build_response_repair_prompt(
     return (
         "上一条完整研究提示和你的上一份回答已在当前对话中，无需重新复制模板，也不要再次输出数百行完整输入文件。"
         "\n\n【本地校验反馈】\n" + validation_error
-        + "\n\n请重新检查上一份回答，输出一个简短、完整、严格可解析的 JSON 对象，使用本轮研究提示末尾定义的 "
-        "IIOS-RESEARCH-PATCH-0.1 紧凑研究补丁协议。对象只能含 response_mode 与 research 两个顶层键。"
+        + "\n\n请只修复本次校验失败之处，仍使用本轮研究提示末尾定义的 IIOS-RESEARCH-PATCH-0.1 紧凑补丁协议。"
+        "输出必须是一个完整 JSON 对象，顶层严格且仅包含 response_mode 与 research。"
+        "JSON 所有键名和字符串值必须使用英文半角双引号 U+0022（字符 \");禁止使用中文智能引号“ ”、弯引号‘ ’、单引号或未加引号的键名。"
+        "键与值之间使用半角冒号，项目之间使用半角逗号。不要输出 JavaScript 对象、注释、Markdown 代码围栏、<escape> 标签或任何解释文字。"
         "只输出需要修改/补充的研究字段；不要返回 schema_version、case、price_input、operator_valuation_context 或 decision_parameters。"
         "本地程序会把补丁合并进受信任的原始模板，并继续执行既有完整性、证据与估值校验。"
         "不要补造未知事实、来源、财务数字或市场一致预期。不要把截断回答强行闭合；请完整输出新的补丁对象。"
+        "不能确认的事实保留 UNKNOWN，不能量化的桥接保留 NOT_IDENTIFIABLE 或 REVIEW_REQUIRED。"
         "\n\n不要让用户手工编辑 JSON；只返回一个 JSON 对象，不要代码围栏或额外说明。"
     )
 

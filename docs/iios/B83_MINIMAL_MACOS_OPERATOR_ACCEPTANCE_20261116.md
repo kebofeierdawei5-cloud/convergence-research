@@ -1,6 +1,9 @@
 # B83 最小 macOS 操作者验收（2026-11-16）
 
-本说明对应 PR #589 的候选分支 `release/v03-integration-20261112`。不要用旧的 `验收IIOS全流程与Replay.command` 更新候选分支：该脚本的旧更新器目标是 `origin/main`，会离开本候选版本。
+本说明对应 PR #589 的候选分支 `release/v03-integration-20261112`。
+
+> **先阅读新版完整操作指引：** [IIOS v0.3 macOS 完整操作指引（ChatGPT 回答接收版）](IIOS_V03_MACOS_OPERATOR_GUIDE_20261117.md)。尤其注意：ChatGPT 的问题粘贴到 ChatGPT 输入框；ChatGPT 的完整回答复制后，切回 IIOS Terminal 按一次回车。终端打印的 `round-a-response.json` / `round-b-response.json` 路径是内部接收位置，正常不需要手工打开或编辑。本文仅用于最小人工验收，不替代完整操作指引。
+不要用旧的 `验收IIOS全流程与Replay.command` 更新候选分支：该脚本的旧更新器目标是 `origin/main`，会离开本候选版本。
 
 ## 1. 更新并启动（只需粘贴一次）
 

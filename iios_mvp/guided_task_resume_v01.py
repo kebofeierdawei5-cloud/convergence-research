@@ -63,20 +63,39 @@ def _show_prompt(prompt: str, response_path: Path, *, phase: str) -> None:
         if phase == "Round A"
         else "Round B 价格感知估值/MIE/预期差提示"
     )
-    print(f"\n{heading} 已持久化；请发送给 ChatGPT。")
+    print(f"\n{heading} 已持久化；系统正在准备 ChatGPT 交接。", flush=True)
     if sys.platform == "darwin":
         try:
             subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
+            print("提示词已自动复制。", flush=True)
         except (OSError, subprocess.SubprocessError):
-            print("剪贴板复制失败；以下是持久化提示词，请手动复制：")
-            print(prompt)
+            print("提示词自动复制失败；请从下面显示的文本中手动复制提示词。", flush=True)
+            print(prompt, flush=True)
         try:
             subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
         except (OSError, subprocess.SubprocessError):
-            pass
+            print("无法自动打开 ChatGPT；请自行打开 https://chatgpt.com/ 。", flush=True)
+
+        print(
+            "\n【请按以下顺序操作：答案不填写在终端】\n"
+            "1. 切换到 ChatGPT 输入框；按 Command+V 粘贴刚复制的 IIOS 提示词并发送。\n"
+            "2. 等待 ChatGPT 完整回答生成；点击该回答下方的“复制”按钮，复制完整回答（包括 JSON）。\n"
+            "3. 切回当前 IIOS Terminal 窗口，在这里按一次回车。不要把回答粘贴到终端。\n"
+            "4. IIOS 只在这次回车后读取一次剪贴板，把回答写入本轮响应文件并自动校验。\n"
+            "5. 校验通过后会自动进入下一阶段；校验未通过时会显示修正提示，按相同方法重试。",
+            flush=True,
+        )
+        print(
+            f"系统内部响应目标：{response_path}\n"
+            "这只是程序接收位置，正常情况下不需要你打开、查找或编辑这个文件。",
+            flush=True,
+        )
+        print(f"现在请先完成 ChatGPT 的 {phase}，复制完整回答后再回到本窗口按回车。", flush=True)
     else:
-        print(prompt)
-    print(f"{phase} 响应文件：{response_path}")
+        print("当前系统不支持 macOS 剪贴板一键接收。请将 ChatGPT 的完整 JSON 回答保存到下列响应文件：")
+        print(str(response_path), flush=True)
+        print("不要把 JSON 粘贴到终端；保存文件后程序会读取并校验。", flush=True)
+        print(prompt, flush=True)
 
 
 def _capture_or_reuse_response(
@@ -133,7 +152,9 @@ def _wait_for_corrected_response(
         signature = current
     else:
         signature = pilot._wait_for_response_file_change(
-            response_path, previous_signature=current
+            response_path,
+            previous_signature=current,
+            allow_clipboard_replacement=True,
         )
     raw = response_path.read_bytes()
     if pilot._response_file_signature(response_path) != signature:
@@ -161,9 +182,20 @@ def _validate_round(
         raise TaskWorkspaceError("GUIDED_TASK_ANALYSIS_PROMPT_SNAPSHOT_MISMATCH")
     template_payload = json.loads(template_path.read_text(encoding="utf-8"))
     while True:
+        manifest_before = session.inspect()
+        attempt_prefix = f"artifacts/{phase.lower()}_response_captured/"
+        attempt_count = sum(
+            1 for name in manifest_before["artifacts"] if name.startswith(attempt_prefix)
+        )
+        print(
+            f"\n[{phase}] 正在校验已接收回答（历史尝试 {attempt_count} 份；不会删除旧回答）...",
+            flush=True,
+        )
         raw, signature = _capture_or_reuse_response(session, pilot, phase, response_path)
+        print(f"[{phase}] 已读取本轮回答，开始检查 JSON 语法。", flush=True)
         try:
             response_object = pilot._extract_json_object(raw.decode("utf-8"))
+            print(f"[{phase}] 第 1/3 步通过：JSON 对象可解析。", flush=True)
             base_path = template_path
             if phase == "ROUND_B":
                 base_path = Path(str(context["round_a_frozen_path"]))
@@ -181,9 +213,11 @@ def _validate_round(
             pilot._validate_research_round_patch(
                 response_object, phase=phase, base_payload=base_payload
             )
+            print(f"[{phase}] 第 2/3 步通过：补丁协议和字段白名单正确。", flush=True)
             merged, response_format, merged_fields = pilot._expand_research_patch_with_template(
                 base_path, response_object
             )
+            print(f"[{phase}] 第 3/3 步通过：补丁已合并到本地原始模板。", flush=True)
             merged.pop("_local_operator_controlled_field_recovery", None)
             merged.pop("_local_research_response_provenance", None)
             restored = pilot._restore_operator_controlled_fields_from_template(
@@ -272,11 +306,19 @@ def _validate_round(
                     "raw_response_file_modified_by_runner": False,
                 }
             session.accept_validated_payload(phase, merged)
+            print(
+                f"[{phase}] PASS：本轮校验通过，任务阶段已安全推进。",
+                flush=True,
+            )
             return merged
         except TaskWorkspaceError:
             raise
         except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
-            print(f"{phase} 尚未通过校验：{exc}", flush=True)
+            print(f"[{phase}] 未通过校验：{exc}", flush=True)
+            print(
+                f"[{phase}] 阶段没有推进；当前失败回答仍保留在历史记录中。正在准备修正提示。",
+                flush=True,
+            )
             repair = pilot._build_response_repair_prompt(
                 original_prompt=session.load_artifact(
                     f"artifacts/{phase.lower()}_prompt_ready/prompt.md"
@@ -284,13 +326,40 @@ def _validate_round(
                 response_path=response_path,
                 validation_error=str(exc),
             )
+            repair_copied = False
             if sys.platform == "darwin":
                 try:
                     subprocess.run(["pbcopy"], input=repair, text=True, check=True, timeout=5)
+                    repair_copied = True
                 except (OSError, subprocess.SubprocessError):
-                    print("修复提示复制失败；请从终端复制下方提示。")
+                    print("修正提示自动复制失败；请从终端下面显示的文本中手动复制。", flush=True)
             print(repair, flush=True)
-            print(f"请修正同一个响应文件；历史响应已作为独立 attempt 保存：{response_path}")
+            if sys.platform == "darwin":
+                if repair_copied:
+                    print(
+                        "\n【现在只做以下 3 个动作】\n"
+                        "1. ChatGPT：切回同一对话输入框，按 Command+V，把刚复制的修正提示发送出去。\n"
+                        "2. ChatGPT：等待这次新回答完整生成，点击“新回答”下方的复制按钮。不要复制上面的修正提示或旧回答。\n"
+                        "3. IIOS：切回当前这个终端窗口，确认已复制新回答后再按一次回车。不要把 JSON 粘贴到终端。\n"
+                        "保护机制：如果剪贴板仍是修正提示或上一份失败回答，IIOS 会拒绝覆盖并继续等待；旧回答一直保留。\n",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        "\n【修正本轮回答】请将上面的修正提示复制到 ChatGPT 同一对话并发送。"
+                        "复制新的完整回答后，回到本终端按一次回车。",
+                        flush=True,
+                    )
+            else:
+                print(
+                    "\n请将修正后的完整 JSON 保存到本轮响应文件，系统会重新校验；"
+                    "历史回答保留在独立 attempt 中。",
+                    flush=True,
+                )
+            print(
+                f"本轮响应文件接收位置：{response_path}（仅供排障；正常不需要手工打开或编辑）",
+                flush=True,
+            )
             _wait_for_corrected_response(session, pilot, phase, response_path)
 
 

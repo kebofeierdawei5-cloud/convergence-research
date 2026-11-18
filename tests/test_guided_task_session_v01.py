@@ -681,3 +681,34 @@ def test_profile_model_family_is_only_the_default_for_this_company(monkeypatch):
     assert defaults == ["4"]
     assert result["selected_model_family"] == "SOTP"
     assert result["baseline_includes_project"] is None
+
+
+
+def test_round_prompt_prints_exact_chatgpt_copy_return_and_enter_handoff(tmp_path, monkeypatch, capsys):
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from iios_mvp.guided_task_resume_v01 import _show_prompt
+
+    monkeypatch.setattr("iios_mvp.guided_task_resume_v01.sys.platform", "darwin")
+    with patch(
+        "iios_mvp.guided_task_resume_v01.subprocess.run",
+        side_effect=[
+            SimpleNamespace(returncode=0),
+            SimpleNamespace(returncode=0),
+        ],
+    ) as run:
+        _show_prompt(
+            "IIOS test prompt",
+            tmp_path / "working" / "round-a-response.json",
+            phase="Round A",
+        )
+
+    assert run.call_count == 2
+    output = capsys.readouterr().out
+    assert "答案不填写在终端" in output
+    assert "Command+V" in output
+    assert "点击该回答下方的“复制”按钮" in output
+    assert "切回当前 IIOS Terminal 窗口" in output
+    assert "按一次回车" in output
+    assert "不需要你打开、查找或编辑这个文件" in output
