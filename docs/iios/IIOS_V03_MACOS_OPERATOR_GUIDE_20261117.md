@@ -33,10 +33,16 @@
 在 Mac Terminal 执行以下命令。它会更新到本修复分支并启动 IIOS：
 
 ```bash
-cd /Users/ccc/projects/convergence-research && git fetch origin fix/b83-chatgpt-response-handoff-20261117 && (git switch fix/b83-chatgpt-response-handoff-20261117 || git switch -c fix/b83-chatgpt-response-handoff-20261117 --track origin/fix/b83-chatgpt-response-handoff-20261117) && git pull --ff-only origin fix/b83-chatgpt-response-handoff-20261117 && bash ./IIOS.command
+REPO="$HOME/projects/convergence-research"
+BRANCH="fix/b83-chatgpt-response-handoff-20261117"
+cd "$REPO" || exit 2
+git fetch origin "$BRANCH" || exit 2
+git switch "$BRANCH" 2>/dev/null || git switch -c "$BRANCH" --track "origin/$BRANCH" || exit 2
+git pull --ff-only origin "$BRANCH" || exit 2
+bash ./IIOS.command
 ```
 
-如果本机项目目录不是上述路径，只替换 `cd` 后面的目录。命令不会执行 `sudo`、`git reset`、`git clean`、`stash`，也不会覆盖未提交文件。如果 Git 因工作区存在修改而拒绝切换分支，先停止并检查修改；不要强制覆盖。
+默认仓库路径使用 `$HOME/projects/convergence-research`，适配当前 macOS 登录用户；不要把其他电脑或旧用户名的绝对路径照搬过来。命令不会执行 `sudo`、`git reset`、`git clean` 或 `stash`。如果工作区有未提交修改，Git 会拒绝切换/快进；先停止并检查修改，不要强制覆盖。
 
 也可以在 Finder 中打开完整项目目录，双击 `IIOS.command`。如果 Finder 没有执行权限，使用上面的 `bash ./IIOS.command` 方式；不要关闭 Gatekeeper 或降低 macOS 安全设置。
 
@@ -139,26 +145,25 @@ Round B 才会使用当前价格输入和已冻结的 Round A 结果，处理估
 - 保留此前原始回答的不可变 attempt 记录；
 - 继续等待修正后的回答。
 
-修正步骤：
+修正时严格按下面三步，不需要打开任何响应文件：
 
-1. 留在**同一个 ChatGPT 对话**，不要新建研究任务。
-2. 切回 ChatGPT，按 Command+V 粘贴 IIOS 刚复制的修正提示并发送。
-3. 等待新的完整回答，点击新回答下方的“复制”按钮。
-4. 切回原 IIOS Terminal 窗口，按一次回车。
-5. IIOS 会把新回答写入本轮临时响应位置，再次进行原有校验。
+1. **ChatGPT：发送修正提示。**留在同一个 ChatGPT 对话，按 Command+V 粘贴 IIOS 已复制的修正提示并发送。
+2. **ChatGPT：复制新回答。**等这次新回答完整生成后，点击这条**新回答**下方的“复制”按钮。不要复制上面的修正提示或旧回答。
+3. **IIOS：接收新回答。**切回原 IIOS Terminal 窗口，确认已经点击新回答的复制按钮后，再按一次回车。
 
-本版本特别修正了旧回答已存在时的接收问题：修正阶段只有在临时响应文件仍与系统刚才观察到的旧版本完全一致时，才允许用新剪贴板回答替换它；旧回答已经进入不可变历史记录，不会被删除。若文件在此期间被其他程序修改，系统会拒绝覆盖并停止该次替换。
+重要保护：修正提示本身没有 JSON 对象，程序会拒绝把它写入响应文件；剪贴板若与上一份失败回答完全相同，也会拒绝覆盖。两种情况都会保留旧回答并继续等待，不会推进任务，也不会自动弹出文件选择窗口。
 
 ### 剪贴板接收失败时
 
-若终端提示剪贴板为空或无法读取：
+如果你在点击新回答“复制”之前误按了回车，程序会检查剪贴板：
 
-- 先确认你复制的是 ChatGPT **完整回答**，不是 Round 提示词；
-- 回到 IIOS Terminal 再按一次回车，程序才会重新尝试一次性读取剪贴板；
-- 若剪贴板仍不可用，macOS 可能弹出文件选择窗口。你可以把 ChatGPT 的完整 JSON 回答另存为一个本地 `.json` 文件，然后在文件选择窗口中选中它。IIOS 会把所选文件内容复制到本轮私有响应位置；你原来的文件不会被删除；
-- 如果取消了文件选择窗口，程序会继续等待。再次复制正确回答、按回车即可重试。
+- 若仍是 IIOS 的修正提示（没有 JSON 对象起始符），不写入、不覆盖，继续等待；
+- 若内容与上一份失败回答完全相同，不写入、不覆盖，继续等待；
+- 若是新的完整回答，则保存为新的历史 attempt，再运行 JSON 和研究字段校验。
 
-如果你选择文件方式，文件应包含一个完整 JSON 对象。不要把两次回答拼在一起，不要在 JSON 前后添加解释性文字，也不要手工修改字段来绕过校验。
+程序不会自动弹出文件选择窗口，也不会要求你手工编辑 JSON。看到“剪贴板中没有发现 JSON 对象”时，只需回到 ChatGPT 等新回答完整生成、点击新回答下方的“复制”，再回终端按一次回车。
+
+当前解析器会在严格 JSON 解析失败后，安全规范化常见的中文智能引号、全角冒号/逗号，以及未加引号的 JavaScript 风格对象键；只处理语法呈现，不改写研究值，不补齐截断内容。原始回答字节仍保存在不可变 attempt 中。
 
 ### 为什么正常情况下不需要知道响应文件路径
 
