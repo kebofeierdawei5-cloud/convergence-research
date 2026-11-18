@@ -9536,11 +9536,14 @@ def _build_response_repair_prompt(
     return (
         "上一条完整研究提示和你的上一份回答已在当前对话中，无需重新复制模板，也不要再次输出数百行完整输入文件。"
         "\n\n【本地校验反馈】\n" + validation_error
-        + "\n\n请重新检查上一份回答，输出一个简短、完整、严格可解析的 JSON 对象，使用本轮研究提示末尾定义的 "
-        "IIOS-RESEARCH-PATCH-0.1 紧凑研究补丁协议。对象只能含 response_mode 与 research 两个顶层键。"
+        + "\n\n请只修复本次校验失败之处，仍使用本轮研究提示末尾定义的 IIOS-RESEARCH-PATCH-0.1 紧凑补丁协议。"
+        "输出必须是一个完整 JSON 对象，顶层严格且仅包含 response_mode 与 research。"
+        "JSON 所有键名和字符串值必须使用英文半角双引号 U+0022（字符 \");禁止使用中文智能引号“ ”、弯引号‘ ’、单引号或未加引号的键名。"
+        "键与值之间使用半角冒号，项目之间使用半角逗号。不要输出 JavaScript 对象、注释、Markdown 代码围栏、<escape> 标签或任何解释文字。"
         "只输出需要修改/补充的研究字段；不要返回 schema_version、case、price_input、operator_valuation_context 或 decision_parameters。"
         "本地程序会把补丁合并进受信任的原始模板，并继续执行既有完整性、证据与估值校验。"
         "不要补造未知事实、来源、财务数字或市场一致预期。不要把截断回答强行闭合；请完整输出新的补丁对象。"
+        "不能确认的事实保留 UNKNOWN，不能量化的桥接保留 NOT_IDENTIFIABLE 或 REVIEW_REQUIRED。"
         "\n\n不要让用户手工编辑 JSON；只返回一个 JSON 对象，不要代码围栏或额外说明。"
     )
 
