@@ -8592,6 +8592,51 @@ def _remove_json_trailing_commas(text: str) -> str:
     return "".join(output)
 
 
+def _quote_unquoted_json_keys(text: str) -> str:
+    """Quote bare object keys only when an identifier is immediately followed by a colon."""
+    output: list[str] = []
+    index = 0
+    in_string = False
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            output.append(char)
+            index += 1
+            continue
+        output.append(char)
+        if char in "{,":
+            look = index + 1
+            while look < len(text) and text[look] in " \t\r\n":
+                look += 1
+            match = re.match(r"[^\W\d][\w$-]*", text[look:], flags=re.UNICODE)
+            if match:
+                key = match.group(0)
+                after_key = look + len(key)
+                colon = after_key
+                while colon < len(text) and text[colon] in " \t\r\n":
+                    colon += 1
+                if colon < len(text) and text[colon] == ":":
+                    output.append(text[index + 1 : look])
+                    output.append(json.dumps(key, ensure_ascii=False))
+                    output.append(text[after_key : colon + 1])
+                    index = colon + 1
+                    continue
+        index += 1
+    return "".join(output)
+
+
 def _extract_json_object(text: str) -> dict[str, Any]:
     """Accept one JSON object, optionally fenced, and reject every non-whitespace suffix."""
     raw = str(text or "").strip()
@@ -8627,9 +8672,22 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     # non-trailing malformed commas, and any non-whitespace suffix still fail.
     url_normalized = re.sub(r"(?i)\b(https?)\\://", r"\1://", candidate)
     url_normalized = re.sub(r"(?i)\bwww\\\.", "www.", url_normalized)
+    # ChatGPT may render JSON punctuation with typographic/full-width quotes.
+    # Strict JSON is attempted first; these presentation-only variants are
+    # tried only after strict parsing fails and never modify the raw attempt.
+    presentation_normalized = candidate.translate(
+        str.maketrans({"“": '"', "”": '"', "‘": '"', "’": '"', "＂": '"', "：": ":", "，": ","})
+    )
+    presentation_normalized = _quote_unquoted_json_keys(presentation_normalized)
     candidates = [candidate]
+    if presentation_normalized != candidate:
+        candidates.append(presentation_normalized)
     if url_normalized != candidate:
         candidates.append(url_normalized)
+    if url_normalized != candidate:
+        presentation_url_normalized = presentation_normalized.replace(r"\://", "://").replace(r"\.", ".")
+        if presentation_url_normalized != presentation_normalized:
+            candidates.append(presentation_url_normalized)
     for base_candidate in list(candidates):
         comma_repaired = _remove_json_trailing_commas(base_candidate)
         if comma_repaired != base_candidate:
@@ -8650,9 +8708,14 @@ def _extract_json_object(text: str) -> dict[str, Any]:
         break
 
     if parse_error is not None:
+        bad_char = parsed_candidate[parse_error.pos : parse_error.pos + 1]
+        char_detail = (
+            f"；该位置字符={bad_char!r}（U+{ord(bad_char):04X}）"
+            if bad_char else ""
+        )
         detail = (
             f"{parse_error.msg}（第 {parse_error.lineno} 行，第 "
-            f"{parse_error.colno} 列）"
+            f"{parse_error.colno} 列{char_detail}）"
         )
         raise LocalInvestmentPilotError(
             "CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT: "
