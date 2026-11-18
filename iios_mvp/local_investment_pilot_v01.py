@@ -289,9 +289,26 @@ def _capture_clipboard_response_once(
         print("剪贴板内容超过 2 MiB 安全上限，未写入。", flush=True)
         return False
     try:
-        raw.decode("utf-8")
+        decoded = raw.decode("utf-8")
     except UnicodeDecodeError:
         print("剪贴板内容不是有效 UTF-8，未写入。", flush=True)
+        return False
+
+    # The repair prompt itself is copied to the clipboard before the operator
+    # sends it to ChatGPT. Do not mistake that prompt (or an unchanged previous
+    # answer) for the new assistant response and overwrite the working file.
+    if not any(marker in decoded for marker in ("{", "｛")):
+        print(
+            "剪贴板中没有发现 JSON 对象起始符；这通常表示剪贴板仍是 IIOS 修正提示，而不是 ChatGPT 新回答。"
+            "本次未覆盖原响应。请等新回答完整生成，点击新回答下方“复制”，再回终端按回车。",
+            flush=True,
+        )
+        return False
+    if replacing_expected and hashlib.sha256(raw).hexdigest() == expected_existing_signature[2]:
+        print(
+            "剪贴板与上一份失败回答完全相同，未覆盖原响应。请复制刚生成的新回答后再按回车。",
+            flush=True,
+        )
         return False
 
     # Immediately before replacement, prove the target is still the exact
@@ -9230,11 +9247,10 @@ def _wait_for_response_file_change(
                             return captured
                     print(_response_file_diagnostic(response_path), flush=True)
                     print(
-                        "如不使用剪贴板，可继续按原方式保存 JSON 文件；"
-                        "系统不会持续读取剪贴板。",
+                        "系统继续等待，不会弹出文件选择窗口。请复制 ChatGPT 新生成的完整回答后再按回车；"
+                        "也可将完整 JSON 保存到响应文件，程序会自动检测保存变化。",
                         flush=True,
                     )
-                    _choose_saved_response_file(response_path)
                 elif latest == previous_signature and not allow_clipboard_replacement:
                     # Normal saved-file path: an unchanged non-empty response
                     # is explicitly revalidated, never replaced by clipboard.
@@ -9261,11 +9277,10 @@ def _wait_for_response_file_change(
                             return captured
                     print(_response_file_diagnostic(response_path), flush=True)
                     print(
-                        "如剪贴板方式不可用，可在文件选择窗口选择已保存的修正 JSON；"
-                        "系统不会在后台读取剪贴板。",
+                        "本轮旧响应保持不变，系统继续等待。请在 ChatGPT 新回答完整生成后点击该新回答下方“复制”，"
+                        "再回本终端按回车；不要复制 IIOS 修正提示本身。",
                         flush=True,
                     )
-                    _choose_saved_response_file(response_path)
         else:
             _time.sleep(poll_interval)
 
